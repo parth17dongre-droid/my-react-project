@@ -4,31 +4,27 @@ import SignupPageView from './signup';
 import { Signup } from './signup';
 import DashboardView from './dashboard';
 import ProtectedRoute from './protectroute';
+import axios from 'axios'; 
+
+axios.defaults.withCredentials = true; 
 
 function Submitlogin() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [dahsboardAllowed, setDashboardAllowed] = useState(false);
-  
   const navigate = useNavigate(); 
 
   const handleLogin = async () => {
     try {
-      const response = await fetch('http://localhost:3000/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
+      const response = await axios.post(
+        'http://localhost:3000/login', 
+        { username, password }
+      );
       
-      const data = await response.json();
-      console.log(data);
-      if(data.success) {
-        localStorage.setItem('access_token', data.access_token);
-        setDashboardAllowed(true);
+      if (response.data.success) {
         navigate('/dashboard'); 
       }
     } catch (error) {
-      console.error("Error during login:", error);
+      console.error("Error during login:", error.response?.data?.message || error.message);
     }
   };
 
@@ -53,22 +49,7 @@ function LoginPageView({ message }) {
 }
 
 export default function App() {
-  const [message, setMessage] = useState('Loading...');
-
-  const fetchLandingData = async () => {
-    try {
-      const response = await fetch('http://localhost:3000');
-      const data = await response.text();
-      setMessage(data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      setMessage('Failed to load data from backend.');
-    }
-  };
-
-  useEffect(() => {
-    fetchLandingData();
-  }, []);
+  const [message] = useState('Login using username and password');
 
   return (
     <BrowserRouter>

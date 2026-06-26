@@ -61,7 +61,7 @@ export default function SignupPageView() {
       const data = await response.json();
 
         if (data.success) {
-            localStorage.setItem('access_token', data.access_token);
+            
             navigate('/dashboard');
         }
     

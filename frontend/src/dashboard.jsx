@@ -1,40 +1,35 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
- 
+import axios from 'axios';
+
 export default function DashboardView() {
+    const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
-
-    async function verifyBackendSession() {
-        try {
-            const response = await fetch('http://localhost:3000/protected', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                }
-            });
-
-            if (!response.ok) {
-                localStorage.removeItem('access_token'); 
-                navigate('/');
-                return;
-            }
-
-            const data = await response.json();
-            if (data.success === true) {
-                setLoading(false); 
-            } else {
-                navigate('/');
-            }
-        } catch (error) {
-            console.error("Session verification failed:", error);
-            navigate('/');
-        }
-    }
 
     useEffect(() => {
-        verifyBackendSession();
+        const fetchDashboardData = async () => {
+            try {
+                const response = await axios.get('http://localhost:3000/protected');
+                if (response.data.success) {
+                    setData(response.data.message);
+                }
+            } catch (error) {
+                console.error("Failed to fetch dashboard resource records:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDashboardData();
     }, []);
+
+    const handleLogout = async () => {
+        try {
+            await axios.post('http://localhost:3000/logout');
+            window.location.href = '/'; 
+        } catch (error) {
+            console.error("Logout failed:", error);
+        }
+    };
 
     if (loading) {
         return (
@@ -44,10 +39,12 @@ export default function DashboardView() {
         );
     }
 
+
     return (
         <div className="dashboard-container" style={{ padding: '20px', fontFamily: 'sans-serif' }}>
             <h1>Dashboard</h1>
-            <p>Welcome to the dashboard! You are securely logged in.</p>
+            <p>{data || "Welcome to the dashboard! You are securely logged in."}</p>
+            <button onClick={handleLogout}>Logout</button>
         </div>
     );
 }
