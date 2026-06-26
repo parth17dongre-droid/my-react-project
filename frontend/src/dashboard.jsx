@@ -22,6 +22,8 @@ export default function DashboardView() {
         fetchDashboardData();
     }, []);
 
+    
+
     const handleLogout = async () => {
         try {
             await axios.post('http://localhost:3000/logout');

@@ -1,9 +1,11 @@
+const path = require('path');
+require('dotenv').config();
 const express = require('express');
+const nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const sqlite3 = require('better-sqlite3');
 const cookieParser = require('cookie-parser');
-
 const JWT_SECRET = 'your_jwt_secret_key'; 
 const app = express();
 const db = new sqlite3('database.db');
@@ -32,6 +34,131 @@ db.prepare(`
     refresh_token TEXT
   )
 `).run();
+
+// 🎯 AUTOMATIC OTP COLUMNS ALTERATION LOGIC
+try {
+    db.exec(`
+      ALTER TABLE users ADD COLUMN otp_code TEXT;
+      ALTER TABLE users ADD COLUMN otp_expires INTEGER;
+      ALTER TABLE users ADD COLUMN otp_verified INTEGER DEFAULT 0;
+    `);
+    console.log("🚀 Database structural schema successfully synchronized with OTP tracking dependencies.");
+} catch (error) {
+    if (!error.message.includes('duplicate column name')) {
+        console.error("❌ Critical database patch sequence failure:", error.message);
+    }
+}
+const EMAIL_PASS = "pnwalovtagegrrnc"
+const EMAIL_USER = "reactappsupport@gmail.com"
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: EMAIL_USER,
+        pass: EMAIL_PASS
+    }
+});
+
+
+app.post('/forgot-password-otp', async (req, res) => {
+    const { email } = req.body;
+   
+
+    try {
+        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+
+        if (!user) {
+            return res.json({ success: true, message: 'If the email exists, an OTP has been dispatched.' });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires = Date.now() + 5 * 60 * 1000;
+
+        db.prepare('UPDATE users SET otp_code = ?, otp_expires = ?, otp_verified = 0 WHERE email = ?')
+          .run(otp, expires, email);
+
+        const mailOptions = {
+            from: `"Secure Auth Portal" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: '🔒 Your One-Time Password (OTP) Reset Code',
+            text: `Your account recovery verification code is: ${otp}. This code is strictly active for 5 minutes.`,
+            html: `
+                <div style="font-family: sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 8px; max-width: 500px;">
+                    <h2 style="color: #333;">Account Security Recovery</h2>
+                    <p>We received a request to reset your password. Use the verification code below to gain access:</p>
+                    <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 4px; border-radius: 4px; color: #2b6cb0; margin: 20px 0;">
+                        ${otp}
+                    </div>
+                    <p style="color: #666; font-size: 12px;">This code will expire in 5 minutes. If you did not request this modification, please secure your account credentials immediately.</p>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`🚀 Live OTP dynamically transmitted to: ${email}`);
+
+        return res.json({ success: true, message: 'OTP sent successfully to your inbox.' });
+
+    } catch (error) {
+        console.error("❌ Critical breakdown during OTP flow execution:", error);
+        return res.status(500).json({ success: false, message: 'Internal mail delivery system failure.' });
+    }
+});
+
+app.post('/verify-otp', (req, res) => {
+    const { email, otp } = req.body;
+
+    try {
+        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+
+        if (!user || !user.otp_code || user.otp_code !== otp) {
+            return res.status(400).json({ success: false, message: 'Invalid verification code.' });
+        }
+
+        if (Date.now() > user.otp_expires) {
+            return res.status(400).json({ success: false, message: 'OTP code has expired.' });
+        }
+
+        db.prepare('UPDATE users SET otp_verified = 1 WHERE email = ?').run(email);
+        return res.json({ success: true, message: 'OTP verified successfully.' });
+    } catch (error) {
+        console.error("Error during OTP validation:", error);
+        return res.status(500).json({ success: false, message: 'Internal validation failure.' });
+    }
+});
+
+app.post('/reset-password-otp', async (req, res) => {
+    const { email, newPassword } = req.body;
+
+    try {
+        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+
+        if (!user || user.otp_verified !== 1) {
+            return res.status(403).json({ success: false, message: 'Unauthorized password modification attempt.' });
+        }
+
+        const hashedpassword = await bcrypt.hash(newPassword, 10);
+        const username = user.username;
+        const payload = { username };
+
+        const access_token = jwt.sign(payload, JWT_SECRET, { expiresIn: 60 });
+        const refresh_token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+
+        db.prepare(`
+            UPDATE users 
+            SET hashedpassword = ?, refresh_token = ?, otp_code = NULL, otp_expires = NULL, otp_verified = 0 
+            WHERE email = ?
+        `).run(hashedpassword, refresh_token, email);
+
+        const cookieOpts = { httpOnly: true, secure: false, sameSite: 'lax', domain: 'localhost', path: '/' };
+        res.cookie('access_token', access_token, { ...cookieOpts, maxAge: 60 * 1000 });
+        res.cookie('refresh_token', refresh_token, { ...cookieOpts, maxAge: 30 * 24 * 60 * 60 * 1000 });
+
+        return res.json({ success: true, message: 'Password updated. Logging you in...' });
+    } catch (error) {
+        console.error("Error during password override execution:", error);
+        return res.status(500).json({ success: false, message: 'Internal server synchronization error.' });
+    }
+});
 
 app.post('/refresh', async (req, res) => {
     const refresh_token = req.cookies.refresh_token;
@@ -73,6 +200,7 @@ app.get('/protected', async (req, res) => {
         return res.status(403).json({ success: false, message: 'Invalid token signature.' });
     }
 });
+
 app.get('/', async (req, res) => {
     res.send('Login using username and password');
 });
@@ -122,13 +250,13 @@ app.post('/login', async (req, res) => {
 app.post('/signup', async (req, res) => {
     const { username, password, email } = req.body;
     
-    if(password.length < 6) {
+    if (password.length < 6) {
         return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
     }
-    if(!/\d/.test(password)) {
+    if (!/\d/.test(password)) {
         return res.status(400).json({ success: false, message: 'Password must contain at least one number' });
     }
-    if(!/[a-zA-Z]/.test(password)) {
+    if (!/[a-zA-Z]/.test(password)) {
         return res.status(400).json({ success: false, message: 'Password must contain at least one letter' });
     }
 
@@ -145,15 +273,20 @@ app.post('/signup', async (req, res) => {
         `);
         stmt.run(username, hashedpassword, email, refresh_token);
 
-        res.cookie('access_token', access_token, { httpOnly: true, secure: false, sameSite: 'lax', maxAge: 60 * 1000 });
-        res.cookie('refresh_token', refresh_token, { httpOnly: true, secure: false, sameSite: 'lax', maxAge: 30 * 24 * 60 * 60 * 1000 });
+        const cookieOpts = { httpOnly: true, secure: false, sameSite: 'lax', domain: 'localhost', path: '/' };
+        res.cookie('access_token', access_token, { ...cookieOpts, maxAge: 60 * 1000 });
+        res.cookie('refresh_token', refresh_token, { ...cookieOpts, maxAge: 30 * 24 * 60 * 60 * 1000 });
 
         return res.json({ success: true, message: 'Signup successful' });
 
     } catch (error) {
-        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-            return res.status(400).json({ success: false, message: 'Username already exists' });
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' || error.message?.includes('UNIQUE')) {
+            if (error.message?.includes('email')) {
+                return res.status(400).json({ success: false, message: 'Email address already registered.' });
+            }
+            return res.status(400).json({ success: false, message: 'Username already exists.' });
         }
+        
         console.error("Error during signup:", error);
         return res.status(500).json({ success: false, message: 'Internal server error' });
     }
@@ -239,6 +372,7 @@ app.post('/logout', async (req, res) => {
 
     return res.json({ success: true, message: 'Logged out successfully' });
 });
+
 app.listen(3000, () => {
     console.log("Server started on port 3000");
 });

@@ -5,10 +5,11 @@ import { Signup } from './signup';
 import DashboardView from './dashboard';
 import ProtectedRoute from './protectroute';
 import axios from 'axios'; 
+import ForgotPasswordOTP from './forgot_password';
 
 axios.defaults.withCredentials = true; 
 
-function Submitlogin() {
+function Submitlogin({ onForgotPassword }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate(); 
@@ -33,16 +34,25 @@ function Submitlogin() {
       <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
       <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
       <button onClick={handleLogin}>Login</button>
+      <p onClick={onForgotPassword} style={{ cursor: 'pointer', color: 'blue' }}>
+        Forgot Password?
+      </p>
     </div>
   );
 }
 
 function LoginPageView({ message }) {
+  const [showRecovery, setShowRecovery] = useState(false);
+
+  if (showRecovery) {
+    return <ForgotPasswordOTP onBackToLogin={() => setShowRecovery(false)} />;
+  }
+
   return (
     <div className="login-container" style={{ padding: '20px', fontFamily: 'sans-serif' }}>
       <h1>Login Page</h1>
       <p>{message}</p>
-      <Submitlogin />
+      <Submitlogin onForgotPassword={() => setShowRecovery(true)} />
       <Signup />
     </div>
   );
