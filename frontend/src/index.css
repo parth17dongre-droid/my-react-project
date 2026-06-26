@@ -1,0 +1,135 @@
+/* ==========================================================================
+   1. Modern Canvas Layout (The Background)
+   ========================================================================== */
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Bright, modern slate backdrop gradient */
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ==========================================================================
+   2. Elevated Transparent Glass Panel
+   ========================================================================== */
+.container, .login-container {
+  width: 100%;
+  max-width: 440px; /* Constrains the entire form to a clean portrait width */
+  padding: 40px 32px;
+  box-sizing: border-box;
+  text-align: center;
+
+  /* Translucent frosted-glass properties */
+  background: rgba(255, 255, 255, 0.55); 
+  backdrop-filter: blur(16px);          
+  -webkit-backdrop-filter: blur(16px);
+  
+  /* Crisp white perimeter stroke mimicking glass-edge refraction */
+  border: 1px solid rgba(255, 255, 255, 0.6); 
+  border-radius: 20px; /* Modern rounded profile */
+
+  /* High-fidelity drop-shadow stack for real depth-perception positioning */
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.08),
+              0 10px 10px -5px rgba(15, 23, 42, 0.04),
+              inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* ==========================================================================
+   3. Integrated Inner Forms & Structural Spacing
+   ========================================================================== */
+
+/* Header alignment inside the frame */
+h1 {
+  color: #0f172a;
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.025em;
+}
+
+/* Network descriptive info line styling */
+p {
+  color: #475569;
+  font-size: 0.95rem;
+  margin: 0 0 28px 0;
+}
+
+/* Structural stacking layer inside your Submitlogin container */
+.container div {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* Uniformly spaces your username and password inputs */
+}
+
+/* Layout spacer between the submit login workflow block and the signup text link */
+.container p:last-of-type {
+  margin-top: 24px;
+  margin-bottom: 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+/* ==========================================================================
+   4. Form Control Interaction Styling (Inputs & Brand Buttons)
+   ========================================================================== */
+input {
+  width: 100%;
+  padding: 14px 16px;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  color: #0f172a;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Interactive focus feedback glow */
+input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+/* Unified structural parameters for both the Login and Sign Up command elements */
+button {
+  width: 100%;
+  padding: 14px;
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 4px;
+}
+
+button:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+button:active {
+  transform: translateY(0);
+}
+.signup-form button:disabled {
+  background-color: #cccccc; /* Greyed out background */
+  color: #666666;            /* Dimmed text color */
+  cursor: not-allowed;       /* Changes the mouse cursor to a red circle with a slash */
+  opacity: 0.6;              /* Makes it look slightly translucent */
+}
+signup-form button:disabled {
+  background-color: #cccccc; /* Greyed out background */
+  color: #666666;            /* Dimmed text color */
+  cursor: not-allowed;       /* Changes the mouse cursor to a red circle with a slash */
+  opacity: 0.6;              /* Makes it look slightly translucent */
+}

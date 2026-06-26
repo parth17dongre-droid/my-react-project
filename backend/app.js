@@ -1,0 +1,151 @@
+const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const sqlite3 = require('better-sqlite3');
+
+const JWT_SECRET = 'your_jwt_secret_key'; 
+const app = express();
+const db = new sqlite3('database.db');
+
+
+
+app.use(cors());
+app.use(express.json());
+
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    hashedpassword TEXT NOT NULL,
+    email TEXT NOT NULL,
+    refresh_token TEXT
+  )
+`).run();
+
+app.post('/refresh', async (req, res) => {
+    const { refresh_token } = req.body;
+    if (!refresh_token) {
+        return res.status(400).json({ success: false, message: 'Refresh token is required' });
+    }
+
+    try {
+        const decoded = jwt.verify(refresh_token, JWT_SECRET);
+        const username = decoded.username;
+
+        const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
+        const user = stmt.get(username);
+
+        if (!user || user.refresh_token !== refresh_token) {
+            return res.status(403).json({ success: false, message: 'Invalid refresh token' });
+        }
+
+        const new_access_token = jwt.sign({ username }, JWT_SECRET, { expiresIn: 60 });
+        return res.json({ success: true, access_token: new_access_token });
+    } catch (error) {
+        return res.status(403).json({ success: false, message: 'Invalid or expired refresh token' });
+    }
+});
+
+app.get('/protected', async (req, res) => {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ 
+        success: false, 
+        message: 'Access denied. Missing or malformed token.' 
+    });
+}
+    const token = authHeader && authHeader.split(' ')[1];
+
+   
+
+    try {
+        jwt.verify(token, JWT_SECRET);
+        return res.json({ success: true, message: 'Access granted to protected route' });
+    } catch (error) {
+        return res.status(403).json({ success: false, message: 'Invalid or expired token' });
+    }
+});
+
+app.get('/', async (req, res) => {
+    res.send('Login using username and password');
+});
+
+app.post('/login', async (req, res) => {
+    const { username, password , email } = req.body;
+    const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
+    const user = stmt.get(username);
+    console.log(user);
+
+    if (!user) {
+        return res.status(400).json({ success: false, message: 'Invalid username or password' });
+    }
+
+    
+        
+        const isMatch = await bcrypt.compare(password, user.hashedpassword);
+        if (!isMatch) {
+            return res.status(400).json({ success: false, message: 'Invalid username or password' });
+        }
+
+        const payload = { username };
+        const access_token = jwt.sign(payload, JWT_SECRET, { expiresIn: 60 });
+        const refresh_token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' })
+        const updateStmt = db.prepare('UPDATE users SET refresh_token = ? WHERE id = ?');
+        updateStmt.run(refresh_token, user.id);
+
+        return res.json({ 
+            success: true, 
+            message: 'Login',
+            access_token
+         
+            
+        });
+    });
+
+
+app.post('/signup', async (req, res) => {
+    const { username, password , email } = req.body;
+    
+    if(password.length < 6) {
+        return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
+    }
+    if(!/\d/.test(password)) {
+        return res.status(400).json({ success: false, message: 'Password must contain at least one number' });
+    }
+    if(!/[a-zA-Z]/.test(password)) {
+        return res.status(400).json({ success: false, message: 'Password must contain at least one letter' });
+    }
+
+    try {
+        const hashedpassword = await bcrypt.hash(password, 10);
+        
+        const payload = { username };
+        const access_token = jwt.sign(payload, JWT_SECRET, { expiresIn: 60 });
+        const refresh_token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+
+        const stmt = db.prepare(`
+            INSERT INTO users (username, hashedpassword, email, refresh_token) 
+            VALUES (?, ?, ?, ?)
+        `);
+        stmt.run(username, hashedpassword, email, refresh_token);
+
+        return res.json({ 
+            success: true, 
+            message: 'Signup successful', 
+            access_token, 
+         
+        });
+
+    } catch (error) {
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            return res.status(400).json({ success: false, message: 'Username already exists' });
+        }
+        console.error("Error during signup:", error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+app.listen(3000, () => {
+    console.log("Server started on port 3000");
+});
